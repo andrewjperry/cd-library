@@ -1,0 +1,834 @@
+<title>CD Library</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,800&family=Instrument+Sans:wght@400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout concept: an artists rail beside a shelf of CD covers, with a slim transport bar fixed along the bottom like a hi-fi front panel.
+   Covers are generated tiles (hue from the album name) until real artwork is added. */
+:root{
+  color-scheme:light;
+  --bg:#EDE2CC; --panel:#F8F0DE; --ink:#2B2118; --muted:#665848; --line:#D0C1A3; --soft:#E2D5BA;
+  --accent:#A9C9EC; --accent-ink:#14304F; --accent-text:#245A93; --warn:#A8480A;
+  --tile-s:44%; --tile-l:80%; --tile-ink:#181A22;
+  --shelf-back:#DCCEB1; --board:#B99468; --board-edge:#8F6E48;
+  --f-display:'Bricolage Grotesque','Avenir Next','Segoe UI',system-ui,sans-serif;
+  --f-body:'Instrument Sans','Segoe UI',system-ui,-apple-system,sans-serif;
+  --f-mono:'DM Mono',ui-monospace,'SF Mono',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:15px; line-height:1.45;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));
+  padding-right:max(16px, env(safe-area-inset-right, 0px));
+  padding-top:22px; padding-bottom:170px;
+}
+.wrap{max-width:1240px; margin:0 auto}
+button{font:inherit; color:inherit}
+:focus-visible{outline:2px solid var(--accent-text); outline-offset:2px}
+.sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+.muted{color:var(--muted)}
+.mono{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+
+/* header */
+.top{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px 28px}
+.top h1{margin:0; font-family:var(--f-display); font-weight:800; font-size:clamp(30px,6vw,46px); letter-spacing:-.025em; line-height:1}
+.stats{margin:8px 0 0; font-family:var(--f-mono); font-size:12.5px; color:var(--muted)}
+.search{flex:1 1 280px; max-width:420px}
+.search input{width:100%; font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:11px 14px}
+.search input::placeholder{color:var(--muted)}
+.banner{display:flex; gap:10px; align-items:flex-start; background:var(--soft); border-radius:8px; padding:11px 14px; margin:18px 0 24px; font-size:13.5px; color:var(--muted)}
+.banner i{flex:none; width:8px; height:8px; border-radius:50%; background:var(--accent); margin-top:6px}
+.link{background:none; border:0; padding:0; color:var(--accent-text); cursor:pointer; text-decoration:underline; text-underline-offset:3px}
+
+/* shell */
+.shell{display:grid; grid-template-columns:minmax(0,1fr); gap:20px}
+@media (min-width:860px){ .shell{grid-template-columns:220px minmax(0,1fr); gap:34px; align-items:start} }
+.rail h2,.label{margin:0 0 8px; font-family:var(--f-mono); font-size:11.5px; font-weight:500; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
+.rail ul{list-style:none; margin:0; padding:0; display:flex; gap:6px; overflow-x:auto; padding-bottom:6px}
+.rail-btn{display:flex; justify-content:space-between; align-items:center; gap:10px; white-space:nowrap; background:none; border:1px solid var(--line); border-radius:999px; padding:7px 13px; cursor:pointer; font-size:14px}
+.rail-btn .n{font-family:var(--f-mono); font-size:12px; color:var(--muted)}
+.rail-btn[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.rail-btn[aria-pressed="true"] .n{color:inherit; opacity:.8}
+@media (min-width:860px){
+  .rail{position:sticky; top:16px; max-height:calc(100vh - 210px); overflow:auto}
+  .rail ul{flex-direction:column; gap:2px; overflow:visible}
+  .rail-btn{width:100%; border:0; border-radius:8px; padding:8px 10px; white-space:normal}
+  .rail-btn:hover{background:var(--soft)}
+  .rail-btn[aria-pressed="true"]:hover{background:var(--accent)}
+}
+
+/* artists and albums */
+.artist{margin-bottom:38px}
+.artist-head{display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 16px; margin-bottom:16px}
+.artist-head h2{margin:0; font-family:var(--f-display); font-weight:800; font-size:clamp(22px,3.4vw,30px); letter-spacing:-.02em; text-wrap:balance}
+.artist-head .muted{font-size:13.5px}
+.actions{display:flex; gap:8px; flex-wrap:wrap; margin-left:auto}
+.btn{display:inline-flex; align-items:center; gap:7px; border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:7px 15px; font-weight:500; font-size:14px; cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
+.btn svg{width:16px; height:16px}
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(158px,1fr)); gap:24px 18px}
+.card{position:relative; min-width:0}
+.covwrap{position:relative}
+.open{display:block; width:100%; padding:0; border:0; background:none; cursor:pointer; border-radius:7px}
+.fab{position:absolute; right:9px; bottom:9px; width:42px; height:42px; border-radius:50%; border:0; background:var(--accent); color:var(--accent-ink); display:grid; place-items:center; cursor:pointer; box-shadow:0 2px 8px rgb(0 0 0 / .25)}
+.fab svg{width:18px; height:18px}
+.meta{padding-top:9px}
+.meta h3{margin:0; font-size:14.5px; font-weight:600; line-height:1.3; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical}
+.meta p{margin:3px 0 0; font-family:var(--f-mono); font-size:12px; color:var(--muted)}
+
+/* generated cover */
+.cover{position:relative; container-type:inline-size; aspect-ratio:1/1; width:100%; overflow:hidden; border-radius:7px;
+  background:hsl(var(--h) var(--tile-s) calc(var(--tile-l) + var(--dl, 0%))); color:var(--tile-ink);
+  display:flex; flex-direction:column; justify-content:space-between; padding:9px 10px}
+.cover::before{content:""; position:absolute; width:92%; aspect-ratio:1; right:-30%; top:-26%; border-radius:50%;
+  border:1px solid color-mix(in srgb, var(--tile-ink) 28%, transparent);
+  background:radial-gradient(circle, transparent 0 9%, color-mix(in srgb, var(--tile-ink) 22%, transparent) 9.5% 10.5%, transparent 11% 100%)}
+.cover .yr{position:relative; font-family:var(--f-mono); font-size:11px; font-size:7.5cqw}
+.cover .ini{position:relative; font-family:var(--f-display); font-weight:800; font-size:44px; font-size:34cqw; line-height:.95; letter-spacing:-.04em}
+.cover .who{position:relative; font-weight:600; font-size:12px; font-size:8.2cqw; line-height:1.15; max-width:62%}
+
+/* album page */
+.album-head{display:grid; grid-template-columns:minmax(0,230px) minmax(0,1fr); gap:26px; align-items:end; margin-bottom:24px}
+@media (max-width:640px){ .album-head{grid-template-columns:minmax(0,1fr)} .album-head .cover{max-width:230px} }
+.album-head h2{margin:6px 0 4px; font-family:var(--f-display); font-weight:800; font-size:clamp(26px,5vw,40px); letter-spacing:-.025em; line-height:1.05; text-wrap:balance}
+.album-head p{margin:0}
+.crumb{font-size:13.5px; color:var(--muted)}
+.album-head .actions{margin:16px 0 0}
+.tracks{list-style:none; margin:0; padding:0; border-top:1px solid var(--line)}
+.disc{font-family:var(--f-mono); font-size:11.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted); padding:10px 6px 3px}
+.row{display:grid; grid-template-columns:2.2em minmax(0,1fr) auto 18px; gap:12px; line-height:1.3; align-items:center; width:100%; text-align:left; background:none; border:0; border-bottom:1px solid var(--line); padding:5px 6px; cursor:pointer}
+.row:hover{background:var(--soft)}
+.row .no{font-family:var(--f-mono); font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
+.row .tm{font-family:var(--f-mono); font-size:13px; color:var(--muted); font-variant-numeric:tabular-nums}
+.row .tt{min-width:0; overflow-wrap:anywhere}
+.row .tt small{display:block; color:var(--muted); font-size:12.5px}
+.row svg{width:15px; height:15px; opacity:0; color:var(--accent-text)}
+.row:hover svg,.row.now svg{opacity:1}
+@media (hover:none){ .row svg{opacity:.45} }
+.row.now{background:var(--soft)}
+.row.now .tt{color:var(--accent-text); font-weight:600}
+.row:disabled{cursor:default; color:var(--muted)}
+.row:disabled:hover{background:none}
+.flag{font-style:normal; font-size:11.5px; margin-left:8px; color:var(--warn); border:1px solid currentColor; border-radius:99px; padding:1px 8px}
+.empty{padding:30px 0; color:var(--muted)}
+
+/* notes */
+.notes{max-width:68ch}
+.notes h2{font-family:var(--f-display); font-weight:800; font-size:clamp(24px,4vw,32px); letter-spacing:-.02em; margin:0 0 6px}
+.notes h3{font-family:var(--f-display); font-weight:800; font-size:19px; margin:30px 0 8px}
+.notes ul,.notes ol{padding-left:1.3em; margin:0}
+.notes li{margin:0 0 9px}
+.notes p{margin:0 0 10px}
+.notes code{font-family:var(--f-mono); font-size:.9em; background:var(--soft); padding:1px 6px; border-radius:5px}
+
+/* player bar */
+.bar{position:fixed; left:0; right:0; bottom:0; z-index:20; background:var(--panel); border-top:1px solid var(--line);
+  padding-top:10px; padding-bottom:calc(10px + env(safe-area-inset-bottom, 0px));
+  padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.bar-in{max-width:1240px; margin:0 auto; display:grid; grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"np ctl" "prog prog"; gap:8px 16px; align-items:center}
+@media (min-width:900px){ .bar-in{grid-template-columns:minmax(0,1fr) auto minmax(0,1.2fr); grid-template-areas:"np ctl prog"; gap:24px} }
+.np{grid-area:np; display:flex; align-items:center; gap:12px; min-width:0}
+.mini{flex:none; width:44px; height:44px; border-radius:5px; background:var(--soft)}
+.mini.on{background:hsl(var(--h) var(--tile-s) calc(var(--tile-l) + var(--dl, 0%)))}
+.np-t{min-width:0}
+.np-title,.np-sub{margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.np-title{font-weight:600}
+.np-sub{font-size:13px; color:var(--muted)}
+.ctl{grid-area:ctl; display:flex; align-items:center; gap:4px}
+.ic{display:grid; place-items:center; width:40px; height:40px; border:0; border-radius:50%; background:none; cursor:pointer}
+.ic svg{width:19px; height:19px}
+.ic:hover:not(:disabled){background:var(--soft)}
+.ic:disabled{opacity:.35; cursor:default}
+.ic.main{width:46px; height:46px; background:var(--accent); color:var(--accent-ink)}
+.ic.main:hover:not(:disabled){background:var(--accent)}
+.ic[aria-expanded="true"]{background:var(--soft)}
+.prog-row{grid-area:prog; display:flex; align-items:center; gap:10px}
+.prog-row .tm{font-family:var(--f-mono); font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; min-width:3.2em}
+.prog-row .tm:last-child{text-align:right}
+.prog{position:relative; flex:1; height:22px; cursor:pointer; display:flex; align-items:center}
+.prog::before{content:""; position:absolute; left:0; right:0; height:4px; border-radius:4px; background:var(--line)}
+.prog span{position:relative; height:4px; border-radius:4px; background:var(--accent-text); width:0}
+.queue{max-width:1240px; margin:0 auto 10px; max-height:min(38vh,320px); overflow:auto; border-bottom:1px solid var(--line)}
+.queue h2{margin:4px 6px 6px}
+.q-item{display:grid; grid-template-columns:2em minmax(0,1fr) auto; gap:10px; width:100%; text-align:left; background:none; border:0; padding:7px 6px; cursor:pointer; font-size:14px}
+.q-item:hover{background:var(--soft)}
+.q-item.now{color:var(--accent-text); font-weight:600}
+.q-item .mono{font-size:12.5px; color:var(--muted)}
+.q-item span:nth-child(2){min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+
+/* tools row */
+.tools{display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px; margin:0 0 20px}
+.lucky{padding:10px 18px; font-size:15px}
+.lucky svg{width:18px; height:18px}
+.switch{display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); cursor:pointer}
+.switch input{accent-color:var(--accent-text); width:17px; height:17px; margin:0}
+.seg{margin-left:auto; display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden}
+.seg button{background:none; border:0; padding:7px 15px; cursor:pointer; font-size:14px}
+.seg button[aria-pressed="true"]{background:var(--ink); color:var(--bg)}
+.lucky-msg{flex-basis:100%; margin:0; min-height:1.5em; font-size:13.5px; color:var(--muted); font-style:italic}
+
+/* the shelf: spines stand on boards, one board per row of 190px spines plus a 22px gap */
+.shelf{border-radius:10px; background:var(--shelf-back); padding:22px 14px 0; box-shadow:inset 0 10px 22px rgb(0 0 0 / .14)}
+.shelf-rows{display:flex; flex-wrap:wrap; align-content:flex-start; align-items:flex-end; gap:22px 3px; padding-bottom:22px;
+  background:repeating-linear-gradient(to bottom, transparent 0 190px, var(--board) 190px 202px, var(--board-edge) 202px 204px, transparent 204px 212px)}
+.spine{position:relative; flex:none; width:34px; height:190px; padding:0; border:0; border-radius:2px; cursor:pointer;
+  background:hsl(var(--h) var(--tile-s) calc(var(--tile-l) + var(--dl, 0%))); color:var(--tile-ink);
+  box-shadow:inset 2px 0 0 rgb(255 255 255 / .28), inset -2px 0 0 rgb(0 0 0 / .18), 1px 0 2px rgb(0 0 0 / .25);
+  transition:transform .18s ease, opacity .2s ease}
+.spine::before,.spine::after{content:""; position:absolute; left:0; right:0; height:9px; background:rgb(0 0 0 / .5)}
+.spine::before{top:0; border-radius:2px 2px 0 0}
+.spine::after{bottom:0}
+.sp-t{position:absolute; left:50%; top:13px; transform:translateX(-50%); writing-mode:vertical-rl; inline-size:164px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px; font-weight:600; text-align:start; line-height:1}
+.sp-t b{font-family:var(--f-mono); font-weight:500; text-transform:uppercase; letter-spacing:.06em; font-size:10px; margin-block-end:6px; display:inline}
+.spine:hover,.spine:focus-visible{transform:translateY(-14px)}
+.spine.pulled{transform:translateY(-30px); box-shadow:inset 2px 0 0 rgb(255 255 255 / .28), inset -2px 0 0 rgb(0 0 0 / .18), 0 10px 18px rgb(0 0 0 / .35)}
+.spine.dim{opacity:.28}
+.shelf-note{margin:12px 2px 0; font-size:13px}
+.spine.gap{margin-left:4px}
+.spine.kin:not(:hover){transform:translateY(-9px)}
+
+/* the opened case */
+.album-head .cover.big{border-radius:3px; box-shadow:0 0 0 7px color-mix(in srgb, var(--ink) 9%, transparent), 0 14px 26px rgb(0 0 0 / .28)}
+.album-head .cover.big::after{content:""; position:absolute; inset:0; background:linear-gradient(135deg, rgb(255 255 255 / .38), transparent 42%, transparent 70%, rgb(255 255 255 / .1))}
+.album-head,.tracks{animation:case-in .28s ease both}
+@keyframes case-in{from{opacity:0; transform:translateY(10px)} to{opacity:1; transform:none}}
+
+/* the case that drops below the shelf and turns to show its front.
+   The box is a two-faced cuboid: 216 x 190 front, 34px spine. Turned 90deg you see the spine, at 0deg the front. */
+.spine.out{visibility:hidden}
+.stage{position:relative; z-index:3; margin-bottom:26px}
+@media (min-width:900px){ .stage-tracks:not(.multi){columns:2; column-gap:30px} .stage-tracks li{break-inside:avoid} }
+.stage-top{display:grid; grid-template-columns:216px minmax(0,1fr); gap:30px; align-items:end; margin:30px 0 22px}
+@media (max-width:640px){ .stage-top{grid-template-columns:minmax(0,1fr)} }
+.stage-case{position:relative; width:216px; max-width:100%; height:190px}
+.box{position:relative; width:216px; height:190px; transform-style:preserve-3d}
+.face{position:absolute; backface-visibility:hidden}
+.face.front{inset:0; transform:translateZ(17px)}
+.face.front .cover{height:100%; aspect-ratio:auto; border-radius:3px; box-shadow:0 0 0 6px color-mix(in srgb, var(--ink) 9%, transparent), 0 16px 26px rgb(0 0 0 / .3)}
+.face.front .cover::after{content:""; position:absolute; inset:0; background:linear-gradient(135deg, rgb(255 255 255 / .38), transparent 42%, transparent 70%, rgb(255 255 255 / .1))}
+.face.side{left:50%; top:0; width:34px; height:190px; margin-left:-17px; transform:rotateY(-90deg) translateZ(108px)}
+.spine-face{background:hsl(var(--h) var(--tile-s) calc(var(--tile-l) + var(--dl, 0%))); color:var(--tile-ink); border-radius:2px; box-shadow:inset 2px 0 0 rgb(255 255 255 / .28), inset -2px 0 0 rgb(0 0 0 / .18)}
+.spine-face::before,.spine-face::after{content:""; position:absolute; left:0; right:0; height:9px; background:rgb(0 0 0 / .5)}
+.spine-face::before{top:0}
+.spine-face::after{bottom:0}
+.stage-info h2{margin:6px 0 4px; font-family:var(--f-display); font-weight:800; font-size:clamp(26px,5vw,40px); letter-spacing:-.025em; line-height:1.05; text-wrap:balance}
+.stage-info p{margin:0}
+.stage-info .actions{margin:16px 0 0}
+.stage-info .crumb{font-size:13.5px; color:var(--muted)}
+@keyframes fade-in{from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none}}
+.stage.anim .stage-info,.stage.anim .stage-tracks{animation:fade-in .45s ease 1.1s both}
+
+.vol{display:inline-flex; align-items:center; gap:6px; margin-left:8px; color:var(--muted)}
+.vol svg{width:18px; height:18px; flex:none}
+.vol input{-webkit-appearance:none; appearance:none; width:90px; height:18px; background:transparent; margin:0; cursor:pointer}
+.vol input::-webkit-slider-runnable-track{height:10px; border-radius:999px; border:1.5px solid var(--accent-text); background:linear-gradient(to right, var(--accent) var(--v,50%), transparent var(--v,50%))}
+.vol input::-moz-range-track{height:7px; border-radius:999px; border:1.5px solid var(--accent-text); background:linear-gradient(to right, var(--accent) var(--v,50%), transparent var(--v,50%))}
+.vol input::-webkit-slider-thumb{-webkit-appearance:none; width:16px; height:16px; margin-top:-5px; border-radius:50%; background:var(--accent); border:2px solid var(--accent-text)}
+.vol input::-moz-range-thumb{width:12px; height:12px; border-radius:50%; background:var(--accent); border:2px solid var(--accent-text)}
+.vol input:disabled{opacity:.4}
+.ctl{flex-wrap:wrap; justify-content:flex-end}
+.gear{margin-left:auto; width:36px; height:36px; padding:0; justify-content:center}
+.gear svg{width:18px; height:18px}
+.seg{margin-left:auto}
+dialog.settings{border:1px solid var(--line); border-radius:14px; background:var(--panel); color:var(--ink); padding:22px; width:min(480px, calc(100vw - 32px))}
+dialog.settings::backdrop{background:rgba(0,0,0,.45)}
+dialog.settings h2{margin:0 0 4px; font-family:var(--display)}
+dialog.settings label{display:block; margin:16px 0 6px; font-weight:600; font-size:14px}
+dialog.settings input{width:100%; font:inherit; font-family:var(--mono); font-size:14px; color:var(--ink); background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:10px 12px}
+dialog.settings .row{display:flex; flex-wrap:wrap; gap:10px; margin-top:16px}
+dialog.settings .hint{color:var(--muted); font-size:13px; margin:6px 0 0}
+dialog.settings .status{min-height:1.4em; margin:14px 0 0; font-size:14px}
+/* phone album list (hidden on larger screens) */
+.albumlist{display:none}
+@media (max-width:640px){
+  body{padding-bottom:250px}
+  .shelf,.shelf-note{display:none}
+  .albumlist{display:block}
+  .al-artist{margin:22px 4px 6px; font-family:var(--f-mono); font-weight:500; font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
+  .al-artist:first-child{margin-top:4px}
+  .al{display:grid; grid-template-columns:12px minmax(0,1fr) auto; align-items:center; gap:14px; width:100%; min-height:54px; text-align:left; padding:8px 12px 8px 0; margin:0 0 6px; border:1px solid var(--line); border-radius:10px; background:var(--panel); cursor:pointer; font-size:16px}
+  .al i{align-self:stretch; border-radius:9px 0 0 9px; background:hsl(var(--h) var(--tile-s) calc(var(--tile-l) + var(--dl, 0%)))}
+  .al-t{font-weight:600; overflow-wrap:anywhere}
+  .al-y{font-family:var(--f-mono); font-size:12.5px; color:var(--muted)}
+  .al.out{background:var(--soft); border-color:var(--accent-text)}
+  .stage-top{margin-top:8px}
+  .tools{gap:8px}
+  .lucky{padding:12px 15px; font-size:15px}
+  .gear{width:44px; height:44px}
+  /* bigger player controls, easy to hit with a thumb */
+  .bar-in{grid-template-columns:minmax(0,1fr); grid-template-areas:"np" "ctl" "prog"; gap:6px}
+  .ctl{justify-content:center; gap:12px; flex-wrap:wrap}
+  .ic{width:52px; height:52px}
+  .ic svg{width:24px; height:24px}
+  .ic.main{width:60px; height:60px}
+  .vol{flex-basis:100%; margin:0}
+  .vol svg{width:22px; height:22px}
+  .vol input{flex:1; width:auto; height:26px}
+  .vol input::-webkit-slider-runnable-track{height:12px}
+  .vol input::-webkit-slider-thumb{width:26px; height:26px; margin-top:-9px}
+  .vol input::-moz-range-track{height:9px}
+  .vol input::-moz-range-thumb{width:20px; height:20px}
+  .prog{height:30px}
+  .prog::before{height:6px}
+  .prog span{height:6px}
+  .prog-row .tm{font-size:13px}
+  .row{padding:10px 6px}
+}
+
+@media (prefers-reduced-motion:reduce){ *{transition:none!important; animation:none!important; scroll-behavior:auto!important} }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>CD Library</h1>
+      <p class="stats" id="stats"></p>
+    </div>
+    <label class="search"><span class="sr">Search artists, albums and tracks</span><input id="q" type="search" placeholder="Search artists, albums, tracks" autocomplete="off"></label>
+  </header>
+
+  <div class="banner" id="banner"><i></i><span id="bannerTxt">Preview: the controls work on screen but make no sound yet. Playback comes when this page is connected to Mopidy on the Raspberry Pi. <button class="link" data-act="notes">Build notes and album art sources</button></span></div>
+
+  <div class="tools">
+    <button class="btn primary lucky" id="lucky"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/></svg>Lucky album</button>
+    <button class="btn primary lucky" id="luckyTrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>Lucky track</button>
+    <button class="btn gear" id="gear" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+    <p class="lucky-msg" id="luckyMsg" aria-live="polite"></p>
+  </div>
+
+  <dialog class="settings" id="settings">
+    <h2>Settings</h2>
+    <p class="hint" id="setNote">Checking the Pi helper…</p>
+    <form method="dialog" id="setForm">
+      <label for="musicDir">Music folder (on the Pi)</label>
+      <input id="musicDir" type="text" spellcheck="false" autocomplete="off">
+      <p class="hint">Laid out as Artist / Album / tracks, as the Music app wrote it.</p>
+      <label>Catalogue</label>
+      <div class="row" style="margin-top:0">
+        <button class="btn" type="button" id="setRescan">Rebuild catalogue</button>
+      </div>
+      <p class="hint">Rescans the saved folder. Use it after ripping more CDs.</p>
+      <p class="status" id="setStatus" aria-live="polite"></p>
+      <div class="row" style="justify-content:flex-end">
+        <button class="btn primary" type="button" id="setSave">Save</button>
+        <button class="btn" value="close">Close</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="shell">
+    <nav class="rail" aria-label="Artists"><h2>Artists</h2><ul id="artists"></ul></nav>
+    <main id="main"></main>
+  </div>
+</div>
+
+<footer class="bar" id="bar" aria-label="Player">
+  <div class="queue" id="queue" hidden></div>
+  <div class="bar-in">
+    <div class="np"><div class="mini" id="mini"></div><div class="np-t"><p class="np-title" id="npTitle">Nothing playing</p><p class="np-sub" id="npSub">Pick an album, an artist or a track.</p></div></div>
+    <div class="ctl">
+      <button class="ic" id="bPrev" aria-label="Previous track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5h2v14H6zM20 5v14L9 12z"/></svg></button>
+      <button class="ic main" id="bPlay" aria-label="Play"></button>
+      <button class="ic" id="bNext" aria-label="Next track"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 5h2v14h-2zM4 5l11 7L4 19z"/></svg></button>
+      <button class="ic" id="bQueue" aria-label="Show queue" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h12M4 12h12M4 18h7M18 14v6l4-3z" stroke-linejoin="round"/></svg></button>
+      <label class="vol" title="Volume"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg><span class="sr">Volume</span><input type="range" id="vol" min="0" max="100" value="50" disabled></label>
+    </div>
+    <div class="prog-row"><span class="tm" id="tNow">0:00</span><div class="prog" id="prog" role="slider" tabindex="0" aria-label="Seek within track" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="progFill"></span></div><span class="tm" id="tEnd">0:00</span></div>
+  </div>
+</footer>
+
+<script>
+(function(){
+'use strict';
+/* Catalogue, built from the files on the Kingston drive. */
+const LIB = __LIB__;
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = (s) => { s = Math.max(0, Math.round(s)); return Math.floor(s/60) + ':' + String(s % 60).padStart(2,'0'); };
+const hashStr = (str) => { let h = 0; for (const ch of str) h = (h*31 + ch.codePointAt(0)) >>> 0; return h; };
+const cleanTitle = (t) => t.replace(/\s*\(\d{4}[^)]*\)\s*$/, '');
+const initials = (t) => {
+  const w = cleanTitle(t).replace(/[\[\(].*$/, '').split(/[^A-Za-z0-9]+/).filter((x) => x && !/^(the|a|an|of|and)$/i.test(x));
+  if (!w.length) return '♪';
+  return w.length === 1 ? w[0].slice(0,2) : (w[0][0] + w[1][0]);
+};
+const I = {
+  play: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 5h4v14H7zM13 5h4v14h-4z"/></svg>',
+  shuffle: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7h3.5c2.5 0 3.7 1.4 5 3.5S14 15 17 15h4M3 17h3.5c1.6 0 2.7-.6 3.6-1.6M13.7 8.6C14.6 7.6 15.7 7 17 7h4M18 4l3 3-3 3M18 12l3 3-3 3"/></svg>'
+};
+
+/* One colour per artist (even steps round the colour wheel keep different artists apart); each album gets its own shade of it.
+   Later, the rescan script should remember each artist's colour so it never shifts when new artists arrive. */
+const HUE = {}, SHADE = {}; let nArtists = 0;
+LIB.forEach((a) => {
+  if (!(a.artist in HUE)) { HUE[a.artist] = Math.round((200 + nArtists++ * 137.508) % 360); SHADE[a.artist] = 0; }
+  a.hue = HUE[a.artist];
+  a.dl = [0, 7, -7, 11, -11][SHADE[a.artist]++ % 5] + '%';
+});
+
+/* Prepare data */
+LIB.forEach((a, i) => {
+  a.id = i;
+  a.tracks.forEach((t, j) => { t.a = i; t.j = j; });
+  a.ok = a.tracks.filter((t) => t.s > 0);
+  a.secs = a.ok.reduce((n, t) => n + t.s, 0);
+  a.discs = Array.from(new Set(a.tracks.map((t) => t.d)));
+});
+const ARTISTS = [];
+LIB.forEach((a) => {
+  let r = ARTISTS.find((x) => x.name === a.artist);
+  if (!r) { r = { name: a.artist, albums: [] }; ARTISTS.push(r); }
+  r.albums.push(a);
+});
+const playable = LIB.reduce((n, a) => n + a.ok.length, 0);
+const broken = LIB.reduce((n, a) => n + (a.tracks.length - a.ok.length), 0);
+const hours = LIB.reduce((n, a) => n + a.secs, 0) / 3600;
+$('#stats').textContent = LIB.length + ' albums · ' + playable + ' tracks · ' + hours.toFixed(1) + ' hours' + (broken ? ' · ' + broken + ' incomplete files' : '');
+
+const S = { artist: null, q: '', mode: 'shelf', view: { k: 'home' }, queue: [], pos: -1, playing: false, t: 0, showQueue: false };
+
+/* Pieces */
+function cover(a, cls) {
+  return '<div class="cover ' + (cls || '') + '" style="--h:' + a.hue + ';--dl:' + a.dl + '"><span class="yr">' + esc(a.year || '') + '</span><span class="ini" aria-hidden="true">' + esc(initials(a.album)) + '</span><span class="who">' + esc(a.artist) + '</span></div>';
+}
+function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+function card(a) {
+  const name = cleanTitle(a.album);
+  return '<article class="card"><div class="covwrap"><button class="open" data-act="open" data-id="' + a.id + '" aria-label="Open ' + esc(name) + '">' + cover(a) + '</button>' +
+    '<button class="fab" data-act="play-album" data-id="' + a.id + '" aria-label="Play ' + esc(name) + '">' + I.play + '</button></div>' +
+    '<div class="meta"><h3 title="' + esc(a.album) + '">' + esc(name) + '</h3><p>' + (a.year ? esc(a.year) + ' · ' : '') + plural(a.ok.length, 'track') + ' · ' + Math.round(a.secs/60) + ' min</p></div></article>';
+}
+function trackRow(t, showAlbum) {
+  const a = LIB[t.a], bad = t.s <= 0;
+  return '<li><button class="row" data-act="play-track" data-a="' + t.a + '" data-j="' + t.j + '"' + (bad ? ' disabled' : '') + '>' +
+    '<span class="no">' + t.n + '</span><span class="tt">' + esc(t.t) + (bad ? '<em class="flag">incomplete file</em>' : '') +
+    (showAlbum ? '<small>' + esc(a.artist) + ' · ' + esc(cleanTitle(a.album)) + '</small>' : '') + '</span>' +
+    '<span class="tm">' + (bad ? '–' : fmt(t.s)) + '</span>' + I.play + '</button></li>';
+}
+
+/* Views */
+function renderRail() {
+  const btn = (name, label, n) => '<li><button class="rail-btn" data-act="artist" data-name="' + esc(name) + '" aria-pressed="' + (S.artist === (name || null)) + '"><span>' + esc(label) + '</span></button></li>';
+  $('#artists').innerHTML = btn('', 'All artists', LIB.length) + ARTISTS.map((r) => btn(r.name, r.name, r.albums.length)).join('');
+}
+function spine(a) {
+  const dim = S.artist && S.artist !== a.artist;
+  const name = cleanTitle(a.album);
+  const gap = a.id > 0 && LIB[a.id - 1].artist !== a.artist;
+  return '<button class="spine' + (dim ? ' dim' : '') + (gap ? ' gap' : '') + '" style="--h:' + a.hue + ';--dl:' + a.dl + '" data-artist="' + esc(a.artist) + '" data-act="open" data-id="' + a.id + '" title="' + esc(a.artist + ' — ' + name) + '" aria-label="' + esc(a.artist + ', ' + name) + '">' +
+    '<span class="sp-t"><b>' + esc(a.artist) + '</b> ' + esc(name) + '</span></button>';
+}
+/* Phones: the shelf is too fiddly to tap, so the same albums appear as a plain list with each artist's colour. */
+function albumList() {
+  const groups = S.artist ? ARTISTS.filter((r) => r.name === S.artist) : ARTISTS;
+  return '<section class="albumlist" aria-label="Albums">' + groups.map((r) =>
+    '<h3 class="al-artist">' + esc(r.name) + '</h3>' + r.albums.map((a) =>
+      '<button class="al" style="--h:' + a.hue + ';--dl:' + a.dl + '" data-act="open" data-id="' + a.id + '"><i></i><span class="al-t">' + esc(cleanTitle(a.album)) + '</span><span class="al-y">' + esc(a.year || '') + '</span></button>').join('')).join('') + '</section>';
+}
+function shelfView() {
+  return '<section class="stage" id="stage" hidden aria-live="polite"></section>' +
+    '<div class="shelf"><div class="shelf-rows">' + LIB.map(spine).join('') + '</div></div>' +
+    '<p class="muted shelf-note">Filed by artist, then year, the way it would sit on a real shelf. Click a spine and the case lifts out above.</p>' + albumList();
+}
+function homeView() {
+  if (S.mode === 'shelf') return shelfView();
+  const list = S.artist ? ARTISTS.filter((r) => r.name === S.artist) : ARTISTS;
+  return list.map((r) => {
+    const n = r.albums.reduce((m, a) => m + a.ok.length, 0);
+    return '<section class="artist"><div class="artist-head"><h2>' + esc(r.name) + '</h2><span class="muted">' + plural(r.albums.length, 'album') + ' · ' + plural(n, 'track') + '</span>' +
+      '<div class="actions"><button class="btn primary" data-act="play-artist" data-name="' + esc(r.name) + '">' + I.play + 'Play</button><button class="btn" data-act="shuffle-artist" data-name="' + esc(r.name) + '">' + I.shuffle + 'Shuffle</button></div></div>' +
+      '<div class="grid">' + r.albums.map(card).join('') + '</div></section>';
+  }).join('');
+}
+function albumView(a) {
+  const multi = a.discs.length > 1;
+  let rows = '', last = null;
+  a.tracks.forEach((t) => {
+    if (multi && t.d !== last) { rows += '<li class="disc">Disc ' + t.d + '</li>'; last = t.d; }
+    rows += trackRow(t, false);
+  });
+  return '<div class="album-head">' + cover(a, 'big') + '<div><p class="crumb"><button class="link" data-act="home">Library</button> / <button class="link" data-act="artist" data-name="' + esc(a.artist) + '">' + esc(a.artist) + '</button></p>' +
+    '<h2>' + esc(cleanTitle(a.album)) + '</h2><p class="muted mono">' + (a.year ? esc(a.year) + ' · ' : '') + plural(a.ok.length, 'track') + ' · ' + Math.round(a.secs/60) + ' min' + (multi ? ' · ' + a.discs.length + ' discs' : '') + '</p>' +
+    '<div class="actions"><button class="btn primary" data-act="play-album" data-id="' + a.id + '">' + I.play + 'Play album</button><button class="btn" data-act="shuffle-album" data-id="' + a.id + '">' + I.shuffle + 'Shuffle</button></div></div></div>' +
+    '<ol class="tracks">' + rows + '</ol>';
+}
+function searchView() {
+  const q = S.q.trim().toLowerCase();
+  const albums = LIB.filter((a) => (a.artist + ' ' + a.album).toLowerCase().includes(q));
+  const tracks = [];
+  LIB.forEach((a) => a.tracks.forEach((t) => { if (t.t.toLowerCase().includes(q)) tracks.push(t); }));
+  if (!albums.length && !tracks.length) return '<p class="empty">Nothing matches “' + esc(S.q.trim()) + '”. Try an artist, an album or part of a track name.</p>';
+  let h = '';
+  if (albums.length) h += '<section class="artist"><div class="artist-head"><h2>Albums</h2><span class="muted">' + albums.length + ' found</span></div><div class="grid">' + albums.map(card).join('') + '</div></section>';
+  if (tracks.length) h += '<section class="artist"><div class="artist-head"><h2>Tracks</h2><span class="muted">' + tracks.length + ' found' + (tracks.length > 60 ? ', showing 60' : '') + '</span></div><ol class="tracks">' + tracks.slice(0, 60).map((t) => trackRow(t, true)).join('') + '</ol></section>';
+  return h;
+}
+const NOTES = [
+  { h: 'Still to build', ol: true, items: [
+    '<b>Real playback.</b> Send the queue to Mopidy through its web API (JSON-RPC over WebSocket, usually port 6680). First check that Mopidy on the Pi plays Apple Lossless <code>.m4a</code> files, using one album.',
+    '<b>Serve this page from the Pi</b>, so any phone or laptop on the network works as a remote control.',
+    '<b>Real album covers</b> (sources below), saved as one <code>cover.jpg</code> in each album folder.',
+    '<b>A rescan script</b> that rebuilds the catalogue from the drive after each ripping session, so nothing is typed by hand. It would also write the readable list and the spreadsheet next to the music.',
+    '<b>Replace the two incomplete tracks</b> on Floored Genius (18 and 19), then rescan.',
+    '<b>A second copy of the music.</b> The Kingston is the only copy right now. Copy it to the 250 GB disk on the Pi 4 (rsync does this safely and only copies what changed), then to the Pi Zero setup.',
+    '<b>Volume and DAC output</b> controls, a lighter version of the page for the Pi Zero, and a physical shuffle button on the Pi 4.',
+    '<b>Nice to have:</b> shuffle everything, recently added, sort by year, a genre filter, remembering the last queue, reordering the queue, keyboard shortcuts.',
+    '<b>Tag tidy-up:</b> group compilations under Various Artists, keep colons in album names, show best-of year ranges. Multi-disc sets are already merged here (Aerial).'
+  ]},
+  { h: 'Album art: possible sources', p: 'As far as I know, and worth checking each one’s terms before relying on it. For personal use only, and covers shouldn’t be republished.', items: [
+    '<b>The Music app itself.</b> It can fetch artwork for most mainstream albums (select an album, then Get Info, then Artwork). The easiest first try, though the image may need saving into the folder as <code>cover.jpg</code>.',
+    '<b>MusicBrainz and the Cover Art Archive.</b> Free and community run. Look the album up by artist and title, then fetch its front image. Good coverage for CDs. Needs care to match the right edition, and a polite rate of about one request a second.',
+    '<b>iTunes Search API.</b> Free, no key. Returns an artwork link that can be swapped for a larger size. Good for mainstream releases, weaker for things like BBC sessions.',
+    '<b>Deezer API.</b> Free search that returns roughly 1000 px covers for most albums.',
+    '<b>Discogs.</b> Best for obscure and regional pressings. Needs a free account and token, with stricter limits and usage terms.',
+    '<b>Your own discs.</b> Scan or photograph the booklet front. It’s the exact edition you own, with no licence questions, and the natural fallback for the oddballs.'
+  ], after: 'Most music players look for <code>cover.jpg</code> or <code>folder.jpg</code> in the album folder, so check what the chosen Mopidy setup expects. A fetch script would need to run on the Mac or the Pi, since my own workspace can’t reach those sites.' }
+];
+function notesView() {
+  return '<div class="notes"><p class="crumb"><button class="link" data-act="home">Library</button> / Notes</p><h2>Build notes</h2>' +
+    NOTES.map((n) => '<h3>' + esc(n.h) + '</h3>' + (n.p ? '<p class="muted">' + n.p + '</p>' : '') + '<' + (n.ol ? 'ol' : 'ul') + '>' + n.items.map((i) => '<li>' + i + '</li>').join('') + '</' + (n.ol ? 'ol' : 'ul') + '>' + (n.after ? '<p style="margin-top:12px">' + n.after + '</p>' : '')).join('') + '</div>';
+}
+
+function render() {
+  renderRail();
+  document.querySelectorAll('[data-act="mode"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode)));
+  const m = $('#main');
+  if (S.q.trim()) m.innerHTML = searchView();
+  else if (S.view.k === 'album') m.innerHTML = albumView(LIB[S.view.id]);
+  else if (S.view.k === 'notes') m.innerHTML = notesView();
+  else m.innerHTML = homeView();
+  if (S.mode === 'shelf' && S.view.k === 'home' && !S.q.trim() && S.open != null) showStage(S.open, false);
+  markNow();
+}
+function route() {
+  const h = location.hash.slice(1);
+  const m = /^album-(\d+)$/.exec(h);
+  S.open = null;
+  if (m && LIB[+m[1]]) {
+    if (S.mode === 'shelf') { S.open = +m[1]; S.view = { k: 'home' }; }
+    else S.view = { k: 'album', id: +m[1] };
+  }
+  else if (h === 'notes') S.view = { k: 'notes' };
+  else S.view = { k: 'home' };
+}
+function go(h) {
+  if (location.hash.slice(1) === h) { route(); render(); window.scrollTo(0, 0); }
+  else location.hash = h;
+}
+let quiet = false;
+window.addEventListener('hashchange', () => {
+  route();
+  if (quiet) { quiet = false; return; }   /* the case animation already did the work */
+  render(); window.scrollTo(0, 0);
+});
+function setHashQuiet(h) { if (location.hash.slice(1) !== h) { quiet = true; location.hash = h; } }
+const reduce = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const T = (x, y, r) => 'translate(' + x + 'px,' + y + 'px) perspective(1100px) rotateY(' + r + 'deg)';
+
+/* Shelf mode: the shelf stays put, the case lifts out and sits above it. */
+function stageHTML(a) {
+  const multi = a.discs.length > 1, name = cleanTitle(a.album);
+  let rows = '', last = null;
+  a.tracks.forEach((t) => {
+    if (multi && t.d !== last) { rows += '<li class="disc">Disc ' + t.d + '</li>'; last = t.d; }
+    rows += trackRow(t, false);
+  });
+  return '<div class="stage-top"><div class="stage-case"><div class="box" id="box"><div class="face front">' + cover(a, 'big') + '</div>' +
+    '<div class="face side spine-face" style="--h:' + a.hue + ';--dl:' + a.dl + '"><span class="sp-t"><b>' + esc(a.artist) + '</b> ' + esc(name) + '</span></div></div></div>' +
+    '<div class="stage-info"><p class="crumb">' + esc(a.artist) + '</p><h2>' + esc(name) + '</h2><p class="muted mono">' + (a.year ? esc(a.year) + ' · ' : '') + plural(a.ok.length, 'track') + ' · ' + Math.round(a.secs/60) + ' min' + (multi ? ' · ' + a.discs.length + ' discs' : '') + '</p>' +
+    '<div class="actions"><button class="btn primary" data-act="play-album" data-id="' + a.id + '">' + I.play + 'Play album</button><button class="btn" data-act="shuffle-album" data-id="' + a.id + '">' + I.shuffle + 'Shuffle</button></div></div></div>' +
+    '<ol class="tracks stage-tracks' + (multi ? ' multi' : '') + '">' + rows + '</ol>';
+}
+function showStage(id, animate) {
+  const st = $('#stage');
+  if (!st) return;
+  document.querySelectorAll('.spine.out,.al.out').forEach((s) => s.classList.remove('out'));
+  const a = LIB[id];
+  st.hidden = false;
+  const phone = matchMedia('(max-width:640px)').matches;
+  st.classList.toggle('anim', !!animate && !reduce() && !phone);
+  st.innerHTML = stageHTML(a);
+  const sp = document.querySelector('.spine[data-id="' + id + '"]'), box = $('#box');
+  markNow();
+  document.querySelectorAll('.al[data-id="' + id + '"]').forEach((x) => x.classList.add('out'));
+  if (phone && animate) window.scrollTo({ top: Math.max(0, window.scrollY + st.getBoundingClientRect().top - 12), behavior: 'auto' });
+  if (!sp || !box) return;
+  if (animate && !reduce() && !phone) {
+    window.scrollTo({ top: Math.max(0, window.scrollY + st.getBoundingClientRect().top - 16), behavior: 'auto' });
+    const s = sp.getBoundingClientRect(), b = box.getBoundingClientRect();
+    const dx = (s.left + s.width / 2) - (b.left + b.width / 2), dy = (s.top + s.height / 2) - (b.top + b.height / 2);
+    box.animate([
+      { transform: T(dx, dy, 90), offset: 0, easing: 'ease-out' },
+      { transform: T(dx, dy - 22, 90), offset: .2, easing: 'cubic-bezier(.55,0,.9,.6)' },
+      { transform: T(dx, 0, 90), offset: .55, easing: 'ease-in-out' },
+      { transform: T(0, 0, 0), offset: 1 }
+    ], { duration: 1500 });
+  }
+  sp.classList.add('out');
+}
+function openAlbum(id, animate) {
+  S.q = ''; $('#q').value = '';
+  if (S.mode !== 'shelf') { S.artist = null; go('album-' + id); return; }
+  if (!$('#stage')) { S.open = null; S.view = { k: 'home' }; render(); }
+  S.open = id;
+  setHashQuiet('album-' + id);
+  showStage(id, animate);
+}
+function closeCase() {
+  const id = S.open, box = $('#box'), sp = document.querySelector('.spine[data-id="' + id + '"]');
+  if (id == null) return;
+  const done = () => { S.open = null; const st = $('#stage'); st.hidden = true; st.innerHTML = ''; if (sp) sp.classList.remove('out'); setHashQuiet(''); };
+  if (!sp || !box || reduce()) { done(); return; }
+  const s = sp.getBoundingClientRect(), b = box.getBoundingClientRect();
+  const dx = (s.left + s.width / 2) - (b.left + b.width / 2), dy = (s.top + s.height / 2) - (b.top + b.height / 2);
+  $('.stage-info').style.visibility = 'hidden'; $('.stage-tracks').style.visibility = 'hidden';
+  box.animate([
+    { transform: T(0, 0, 0), offset: 0 },
+    { transform: T(dx, 0, 90), offset: .45 },
+    { transform: T(dx, dy - 22, 90), offset: .8 },
+    { transform: T(dx, dy, 90), offset: 1 }
+  ], { duration: 1000, easing: 'ease-in-out', fill: 'forwards' }).onfinish = done;
+}
+
+/* Player. Live (Mopidy over ws://<pi>:6680/mopidy/ws) when served by the Pi helper; otherwise a pretend timer stands in for the audio. */
+const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+let timer = null, lastTick = 0;
+
+/* Mopidy link. Only attempted when the helper on the Pi is serving this page; otherwise the pretend timer stays. */
+const M = { on: false, ws: null, seq: 0, cbs: {}, tlids: [], root: null };
+M.call = (method, params) => new Promise((res, rej) => {
+  if (!M.on) { rej(new Error('offline')); return; }
+  const id = ++M.seq; M.cbs[id] = [res, rej];
+  M.ws.send(JSON.stringify({ jsonrpc: '2.0', id: id, method: method, params: params || {} }));
+});
+M.uri = (t) => 'file://' + (M.root + '/' + t.p).split('/').map(encodeURIComponent).join('/');
+M.say = (msg) => { $('#npSub').textContent = msg; };
+M.banner = () => { $('#bannerTxt').innerHTML = M.on
+  ? 'Connected to Mopidy on this Pi: the controls play real music. <button class="link" data-act="notes">Build notes and album art sources</button>'
+  : 'Mopidy is not answering, so the controls are in preview mode. Retrying every few seconds. <button class="link" data-act="notes">Build notes and album art sources</button>'; };
+M.connect = () => {
+  let ws;
+  try { ws = new WebSocket((location.protocol === 'https:' ? 'wss://' : 'ws://') + location.hostname + ':6680/mopidy/ws'); } catch (e) { return; }
+  M.ws = ws;
+  ws.onopen = () => { M.on = true; M.banner(); lastTick = performance.now();
+    M.call('core.mixer.get_volume').then((v) => { const el = $('#vol'); if (v == null) { el.disabled = true; el.title = 'Mopidy has no volume control on this Pi'; } else { el.disabled = false; el.value = v; el.style.setProperty('--v', v + '%'); el.title = ''; } }).catch(() => {}); };
+  ws.onmessage = (ev) => {
+    let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+    if (m.id && M.cbs[m.id]) { const cb = M.cbs[m.id]; delete M.cbs[m.id]; if (m.error) cb[1](new Error(m.error.message || 'error')); else cb[0](m.result); return; }
+    if (m.event === 'track_playback_started') {
+      const i = M.tlids.indexOf(m.tl_track.tlid);
+      if (i >= 0) { S.pos = i; S.t = 0; S.playing = true; lastTick = performance.now(); renderBar(); }
+    } else if (m.event === 'playback_state_changed') { S.playing = m.new_state === 'playing'; lastTick = performance.now(); renderBar(); }
+    else if (m.event === 'volume_changed') { $('#vol').value = m.volume; $('#vol').style.setProperty('--v', m.volume + '%'); }
+    else if (m.event === 'seeked') { S.t = m.time_position / 1000; lastTick = performance.now(); updateProgress(); }
+  };
+  ws.onclose = () => { const was = M.on; M.on = false; M.cbs = {}; M.banner(); if (was) { S.playing = false; renderBar(); } setTimeout(M.connect, 5000); };
+  ws.onerror = () => { try { ws.close(); } catch (e) {} };
+};
+M.start = (list, start) => {
+  const uris = list.map(M.uri);
+  S.queue = list; S.pos = start; S.t = 0; S.playing = true; lastTick = performance.now(); renderBar();
+  M.call('core.tracklist.clear')
+    .then(() => M.call('core.tracklist.add', { uris: uris }))
+    .then((tl) => {
+      M.tlids = tl.length === uris.length ? tl.map((x) => x.tlid) : uris.map((u) => { const f = tl.find((x) => x.track.uri === u); return f ? f.tlid : null; });
+      const id = M.tlids[start] != null ? M.tlids[start] : M.tlids.find((x) => x != null);
+      if (id == null) throw new Error('Mopidy could not find those files. Is the music folder the one it is allowed to play from?');
+      return M.call('core.playback.play', { tlid: id });
+    })
+    .catch((e) => { S.playing = false; renderBar(); M.say(e.message === 'offline' ? 'Mopidy went away.' : e.message); });
+};
+setInterval(() => {
+  if (!M.on || !S.playing) { lastTick = performance.now(); return; }
+  const now = performance.now(); S.t += (now - lastTick) / 1000; lastTick = now; updateProgress();
+}, 250);
+setInterval(() => {
+  if (M.on && S.playing) M.call('core.playback.get_time_position').then((ms) => { S.t = ms / 1000; lastTick = performance.now(); }).catch(() => {});
+}, 3000);
+fetch('/api/settings').then((r) => { if (!r.ok) throw 0; return r.json(); }).then((s) => { M.root = s.music_dir; M.connect(); }).catch(() => {});
+
+function startQueue(list, start) { if (!list.length) return; if (M.on) { M.start(list, start); return; } S.queue = list; S.pos = start; S.t = 0; setPlaying(true); }
+function setPlaying(p) {
+  if (M.on) {
+    if (!S.queue[S.pos]) return;
+    S.playing = p; lastTick = performance.now(); renderBar();
+    if (p) M.call('core.playback.get_state').then((st) => M.call(st === 'stopped' ? 'core.playback.play' : 'core.playback.resume', st === 'stopped' ? { tlid: M.tlids[S.pos] } : {})).catch(() => {});
+    else M.call('core.playback.pause').catch(() => {});
+    return;
+  }
+  S.playing = p && S.pos >= 0;
+  if (S.playing) { lastTick = performance.now(); if (!timer) timer = setInterval(tick, 250); }
+  else if (timer) { clearInterval(timer); timer = null; }
+  renderBar();
+}
+function tick() {
+  const now = performance.now(); S.t += (now - lastTick) / 1000; lastTick = now;
+  const cur = S.queue[S.pos];
+  if (cur && S.t >= cur.s) next(); else updateProgress();
+}
+function next() {
+  if (M.on) { M.call('core.playback.next').catch(() => {}); return; }
+  if (S.pos < S.queue.length - 1) { S.pos++; S.t = 0; renderBar(); }
+  else { S.t = 0; S.pos = 0; setPlaying(false); }
+}
+function prev() { if (M.on) { if (S.t > 3 || S.pos === 0) seek(0); else M.call('core.playback.previous').catch(() => {}); return; }
+  if (S.t > 3 || S.pos === 0) S.t = 0; else { S.pos--; S.t = 0; } lastTick = performance.now(); renderBar(); }
+function seek(f) { const cur = S.queue[S.pos]; if (!cur) return; S.t = Math.max(0, Math.min(cur.s - 0.5, f * cur.s)); lastTick = performance.now(); if (M.on) M.call('core.playback.seek', { time_position: Math.round(S.t * 1000) }).catch(() => {}); updateProgress(); }
+const albumQueue = (a) => a.ok;
+function artistQueue(name) { const r = ARTISTS.find((x) => x.name === name); return r ? [].concat.apply([], r.albums.map(albumQueue)) : []; }
+
+function updateProgress() {
+  const cur = S.queue[S.pos];
+  if (!cur) { $('#progFill').style.width = '0%'; $('#tNow').textContent = '0:00'; $('#tEnd').textContent = '0:00'; return; }
+  const f = Math.min(1, S.t / cur.s);
+  $('#progFill').style.width = (f * 100) + '%';
+  $('#tNow').textContent = fmt(S.t); $('#tEnd').textContent = fmt(cur.s);
+  $('#prog').setAttribute('aria-valuenow', String(Math.round(f * 100)));
+}
+function renderQueue() {
+  const q = $('#queue');
+  q.hidden = !S.showQueue;
+  $('#bQueue').setAttribute('aria-expanded', String(S.showQueue));
+  if (!S.showQueue) return;
+  q.innerHTML = S.queue.length
+    ? '<h2 class="label">Queue</h2>' + S.queue.slice(0, 300).map((t, i) => '<button class="q-item' + (i === S.pos ? ' now' : '') + '" data-act="jump" data-i="' + i + '"><span class="mono">' + (i + 1) + '</span><span>' + esc(t.t) + ' <span class="muted">· ' + esc(LIB[t.a].artist) + '</span></span><span class="mono">' + fmt(t.s) + '</span></button>').join('')
+    : '<p class="empty" style="padding:14px 6px">The queue is empty. Play an album, an artist or a track.</p>';
+}
+function markNow() {
+  document.querySelectorAll('.row.now').forEach((r) => r.classList.remove('now'));
+  const cur = S.queue[S.pos];
+  if (!cur) return;
+  const r = document.querySelector('.row[data-a="' + cur.a + '"][data-j="' + cur.j + '"]');
+  if (r) r.classList.add('now');
+}
+function renderBar() {
+  const cur = S.queue[S.pos], mini = $('#mini');
+  if (cur) {
+    const a = LIB[cur.a];
+    $('#npTitle').textContent = cur.t;
+    $('#npSub').textContent = a.artist + ' · ' + cleanTitle(a.album);
+    mini.style.setProperty('--h', a.hue); mini.style.setProperty('--dl', a.dl); mini.classList.add('on');
+  } else {
+    $('#npTitle').textContent = 'Nothing playing';
+    $('#npSub').textContent = 'Pick an album, an artist or a track.';
+    mini.classList.remove('on');
+  }
+  $('#bPlay').innerHTML = S.playing ? I.pause : I.play;
+  $('#bPlay').setAttribute('aria-label', S.playing ? 'Pause' : 'Play');
+  ['#bPrev', '#bPlay', '#bNext'].forEach((id) => { $(id).disabled = !cur; });
+  renderQueue(); updateProgress(); markNow();
+}
+
+/* Events */
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-act]');
+  if (!b) return;
+  const d = b.dataset;
+  switch (d.act) {
+    case 'artist': S.artist = d.name || null; S.q = ''; $('#q').value = '';
+      /* With a case open on the shelf, keep it open and just dim the other artists' spines. */
+      if (S.mode === 'shelf' && S.view.k === 'home' && S.open != null) { render(); break; }
+      go(''); break;
+    case 'home': S.q = ''; $('#q').value = ''; go(''); break;
+    case 'notes': S.q = ''; $('#q').value = ''; go('notes'); break;
+    case 'open': openAlbum(+d.id, true); break;
+    case 'close-case': closeCase(); break;
+    case 'mode': S.mode = d.mode; S.q = ''; $('#q').value = ''; go(''); break;
+    case 'play-album': startQueue(albumQueue(LIB[+d.id]), 0); break;
+    case 'shuffle-album': startQueue(shuffled(albumQueue(LIB[+d.id])), 0); break;
+    case 'play-artist': startQueue(artistQueue(d.name), 0); break;
+    case 'shuffle-artist': startQueue(shuffled(artistQueue(d.name)), 0); break;
+    case 'play-track': { const a = LIB[+d.a], q = albumQueue(a), i = q.indexOf(a.tracks[+d.j]); if (i >= 0) startQueue(q, i); break; }
+    case 'jump': if (M.on) { S.pos = +d.i; S.t = 0; M.call('core.playback.play', { tlid: M.tlids[+d.i] }).catch(() => {}); break; } S.pos = +d.i; S.t = 0; if (!S.playing) setPlaying(true); else { lastTick = performance.now(); renderBar(); } break;
+  }
+});
+/* I'm feeling lucky: pick one CD at random, pull its spine, open it and play it. */
+const LUCKY = [
+  (n) => 'Fate has chosen ' + n + '. It had its reasons and is keeping them to itself.',
+  (n) => 'The Improbability Drive selected ' + n + '. Nobody is more surprised than the Drive.',
+  (n) => 'Chosen entirely by chance: ' + n + '. Mostly harmless.',
+  (n) => n + '. A towel-worthy choice.'
+];
+let luckyBusy = false, lastLucky = -1;
+function lucky(kind) {
+  if (luckyBusy) return;
+  const everyTrack = [].concat.apply([], LIB.map(albumQueue));
+  let pick = null, a;
+  if (kind === 'track') { pick = everyTrack[Math.floor(Math.random() * everyTrack.length)]; a = LIB[pick.a]; }
+  else {
+    const pool = LIB.filter((x) => x.ok.length);
+    a = pool[Math.floor(Math.random() * pool.length)];
+    if (pool.length > 1 && a.id === lastLucky) a = pool[(pool.indexOf(a) + 1) % pool.length];
+  }
+  lastLucky = a.id; luckyBusy = true;
+  const what = pick ? '“' + pick.t + '” by ' + a.artist : cleanTitle(a.album) + ' by ' + a.artist;
+  $('#luckyMsg').textContent = LUCKY[Math.floor(Math.random() * LUCKY.length)](what);
+  const finish = () => {
+    luckyBusy = false;
+    /* A lucky track plays first, then the rest of the library in random order so the music keeps coming. An album plays in order, then more random albums follow, each in order. */
+    const q = pick ? [pick].concat(shuffled(everyTrack.filter((t) => t !== pick))) : albumQueue(a).concat([].concat.apply([], shuffled(LIB.filter((x) => x !== a && x.ok.length)).map(albumQueue)));
+    S.q = ''; $('#q').value = ''; S.artist = null; S.open = null;
+    if (S.mode === 'shelf') { S.view = { k: 'home' }; render(); openAlbum(a.id, true); }
+    else go('album-' + a.id);
+    startQueue(q, 0);
+  };
+  finish();
+}
+/* Hovering or focusing a spine lifts every spine by the same artist a little. */
+const kin = (spine, on) => { if (!spine) return; document.querySelectorAll('.spine').forEach((s) => s.classList.toggle('kin', on && s.dataset.artist === spine.dataset.artist)); };
+document.addEventListener('mouseover', (e) => kin(e.target.closest('.spine'), true));
+document.addEventListener('mouseout', (e) => kin(e.target.closest('.spine'), false));
+document.addEventListener('focusin', (e) => kin(e.target.closest('.spine'), true));
+document.addEventListener('focusout', (e) => kin(e.target.closest('.spine'), false));
+$('#lucky').addEventListener('click', () => lucky('album'));
+$('#luckyTrack').addEventListener('click', () => lucky('track'));
+$('#bPlay').addEventListener('click', () => setPlaying(!S.playing));
+$('#bNext').addEventListener('click', () => { next(); if (!S.playing && S.pos > 0) setPlaying(true); });
+$('#bPrev').addEventListener('click', prev);
+let volT = null;
+$('#vol').addEventListener('input', (e) => { const v = +e.target.value; e.target.style.setProperty('--v', v + '%'); clearTimeout(volT); volT = setTimeout(() => { if (M.on) M.call('core.mixer.set_volume', { volume: v }).catch(() => {}); }, 60); });
+$('#bQueue').addEventListener('click', () => { S.showQueue = !S.showQueue; renderQueue(); });
+$('#prog').addEventListener('click', (e) => { const r = e.currentTarget.getBoundingClientRect(); seek((e.clientX - r.left) / r.width); });
+$('#prog').addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight') { seek((S.t + 5) / (S.queue[S.pos] ? S.queue[S.pos].s : 1)); e.preventDefault(); }
+  if (e.key === 'ArrowLeft') { seek((S.t - 5) / (S.queue[S.pos] ? S.queue[S.pos].s : 1)); e.preventDefault(); }
+});
+$('#q').addEventListener('input', (e) => { S.q = e.target.value; render(); });
+$('#q').addEventListener('keydown', (e) => { if (e.key === 'Escape') { S.q = ''; e.target.value = ''; render(); } });
+
+/* Settings: talks to the helper (server.py) on the Pi. Without it (preview) the panel says so. */
+(function settings(){
+  const dlg = $('#settings'), note = $('#setNote'), dir = $('#musicDir'), st = $('#setStatus');
+  const btns = [$('#setSave'), $('#setRescan')];
+  let live = false;
+  const api = (p, o) => fetch(p, o).then((r) => { if (!r.ok) throw new Error(r.status); return r.json(); });
+  const poll = () => api('/api/rescan').then((s) => {
+    if (s.running) { st.textContent = 'Scanning… ' + s.done + ' of ' + s.total + ' files'; setTimeout(poll, 1000); }
+    else if (s.error) { st.textContent = 'Scan failed: ' + s.error; btns.forEach((b) => b.disabled = false); }
+    else if (s.finished) { st.textContent = 'Done: ' + s.albums + ' albums, ' + s.tracks + ' tracks. Reloading…'; setTimeout(() => location.reload(), 900); }
+  }).catch(() => { st.textContent = 'Lost contact with the helper.'; btns.forEach((b) => b.disabled = false); });
+  const scan = () => { btns.forEach((b) => b.disabled = true); st.textContent = 'Starting scan…';
+    api('/api/rescan', { method: 'POST' }).then(poll).catch(() => { st.textContent = 'Could not start the scan.'; btns.forEach((b) => b.disabled = false); }); };
+  $('#gear').addEventListener('click', () => {
+    dlg.showModal(); st.textContent = '';
+    api('/api/settings').then((s) => { live = true; dir.value = s.music_dir; dir.disabled = false; btns.forEach((b) => b.disabled = false);
+      note.textContent = 'Connected to the Pi helper.'; })
+    .catch(() => { live = false; dir.disabled = true; btns.forEach((b) => b.disabled = true);
+      note.textContent = 'Preview mode: these settings work once the page is served by the helper on the Pi.'; });
+  });
+  $('#setRescan').addEventListener('click', () => { if (live) scan(); });
+  $('#setSave').addEventListener('click', () => { if (!live) return;
+    api('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ music_dir: dir.value.trim() }) })
+      .then(() => { st.textContent = 'Saved. Click Rebuild catalogue to scan it.'; }).catch(() => { st.textContent = 'That folder does not exist on the Pi.'; }); });
+})();
+
+route(); render(); renderBar();
+})();
+</script>
