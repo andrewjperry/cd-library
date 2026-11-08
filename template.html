@@ -51,16 +51,15 @@ button{font:inherit; color:inherit}
 .shell{display:grid; grid-template-columns:minmax(0,1fr); gap:20px}
 @media (min-width:860px){ .shell{grid-template-columns:220px minmax(0,1fr); gap:34px; align-items:start} }
 .rail h2,.label{margin:0 0 8px; font-family:var(--f-mono); font-size:11.5px; font-weight:500; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
-.rail ul{list-style:none; margin:0; padding:0; display:flex; gap:6px; overflow-x:auto; padding-bottom:6px}
-.rail-btn{display:flex; justify-content:space-between; align-items:center; gap:10px; white-space:nowrap; background:none; border:1px solid var(--line); border-radius:999px; padding:7px 13px; cursor:pointer; font-size:14px}
+.rail ul{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:2px; max-height:42vh; overflow-y:auto}
+.rail-btn{display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; text-align:left; background:none; border:0; border-radius:8px; padding:8px 10px; cursor:pointer; font-size:14px}
+.rail-btn:hover{background:var(--soft)}
 .rail-btn .n{font-family:var(--f-mono); font-size:12px; color:var(--muted)}
 .rail-btn[aria-pressed="true"]{background:var(--accent); border-color:var(--accent); color:var(--accent-ink)}
 .rail-btn[aria-pressed="true"] .n{color:inherit; opacity:.8}
 @media (min-width:860px){
   .rail{position:sticky; top:16px; max-height:calc(100vh - 210px); overflow:auto}
-  .rail ul{flex-direction:column; gap:2px; overflow:visible}
-  .rail-btn{width:100%; border:0; border-radius:8px; padding:8px 10px; white-space:normal}
-  .rail-btn:hover{background:var(--soft)}
+  .rail ul{max-height:none; overflow:visible}
   .rail-btn[aria-pressed="true"]:hover{background:var(--accent)}
 }
 
@@ -248,10 +247,18 @@ dialog.settings .hint{color:var(--muted); font-size:13px; margin:6px 0 0}
 dialog.settings .status{min-height:1.4em; margin:14px 0 0; font-size:14px}
 /* phone album list (hidden on larger screens) */
 .albumlist{display:none}
+.al-back{display:none}
 @media (max-width:640px){
   body{padding-bottom:250px}
   .shelf,.shelf-note{display:none}
   .albumlist{display:block}
+  .rail{display:none}
+  body.ph-pick .rail{display:block}
+  body.ph-pick main{display:none}
+  .rail ul{max-height:none; overflow:visible}
+  .rail-btn{min-height:50px; font-size:16px; padding:10px 12px; border-bottom:1px solid var(--line); border-radius:0}
+  .rail-btn[data-name='']{display:none}
+  .al-back{display:inline-flex; align-items:center; gap:6px; margin:0 0 10px; padding:10px 4px; font-size:15px}
   .al-artist{margin:22px 4px 6px; font-family:var(--f-mono); font-weight:500; font-size:12px; letter-spacing:.09em; text-transform:uppercase; color:var(--muted)}
   .al-artist:first-child{margin-top:4px}
   .al{display:grid; grid-template-columns:12px minmax(0,1fr) auto; align-items:center; gap:14px; width:100%; min-height:54px; text-align:left; padding:8px 12px 8px 0; margin:0 0 6px; border:1px solid var(--line); border-radius:10px; background:var(--panel); cursor:pointer; font-size:16px}
@@ -431,7 +438,7 @@ function spine(a) {
 /* Phones: the shelf is too fiddly to tap, so the same albums appear as a plain list with each artist's colour. */
 function albumList() {
   const groups = S.artist ? ARTISTS.filter((r) => r.name === S.artist) : ARTISTS;
-  return '<section class="albumlist" aria-label="Albums">' + groups.map((r) =>
+  return '<section class="albumlist" aria-label="Albums">' + ((S.artist || S.open != null) ? '<button class="link al-back" data-act="phone-back">&larr; All artists</button>' : '') + groups.map((r) =>
     '<h3 class="al-artist">' + esc(r.name) + '</h3>' + r.albums.map((a) =>
       '<button class="al" style="--h:' + a.hue + ';--dl:' + a.dl + '" data-act="open" data-id="' + a.id + '"><i></i><span class="al-t">' + esc(cleanTitle(a.album)) + '</span><span class="al-y">' + esc(a.year || '') + '</span></button>').join('')).join('') + '</section>';
 }
@@ -516,6 +523,7 @@ function notesView() {
 function render() {
   renderRail();
   document.querySelectorAll('[data-act="mode"]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.mode === S.mode)));
+  document.body.classList.toggle('ph-pick', S.view.k === 'home' && !S.artist && !S.q.trim() && S.open == null);
   const m = $('#main');
   if (S.q.trim()) m.innerHTML = searchView();
   else if (S.view.k === 'album') m.innerHTML = albumView(LIB[S.view.id]);
@@ -758,6 +766,7 @@ document.addEventListener('click', (e) => {
     case 'open': openAlbum(+d.id, true); break;
     case 'close-case': closeCase(); break;
     case 'mode': S.mode = d.mode; S.q = ''; $('#q').value = ''; go(''); break;
+    case 'phone-back': S.artist = null; S.open = null; go(''); window.scrollTo(0, 0); break;
     case 'play-best': playBest(); break;
     case 'play-album': startQueue(albumQueue(LIB[+d.id]), 0); break;
     case 'shuffle-album': startQueue(shuffled(albumQueue(LIB[+d.id])), 0); break;
