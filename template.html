@@ -37,7 +37,10 @@ button{font:inherit; color:inherit}
 .top{display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px 28px}
 .top h1{margin:0; font-family:var(--f-display); font-weight:800; font-size:clamp(30px,6vw,46px); letter-spacing:-.025em; line-height:1}
 .stats{margin:8px 0 0; font-family:var(--f-mono); font-size:12.5px; color:var(--muted)}
-.search{flex:1 1 280px; max-width:420px}
+.search{flex:1 1 260px; max-width:420px}
+.tools .search{margin-right:4px}
+.best{display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin:0 0 18px; padding:12px 14px; background:var(--panel); border:1px solid var(--line); border-radius:10px}
+.best b{margin-right:auto}
 .search input{width:100%; font:inherit; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:11px 14px}
 .search input::placeholder{color:var(--muted)}
 .banner{display:flex; gap:10px; align-items:flex-start; background:var(--soft); border-radius:8px; padding:11px 14px; margin:18px 0 24px; font-size:13.5px; color:var(--muted)}
@@ -289,12 +292,12 @@ dialog.settings .status{min-height:1.4em; margin:14px 0 0; font-size:14px}
       <h1>CD Library</h1>
       <p class="stats" id="stats"></p>
     </div>
-    <label class="search"><span class="sr">Search artists, albums and tracks</span><input id="q" type="search" placeholder="Search artists, albums, tracks" autocomplete="off"></label>
   </header>
 
   <div class="banner" id="banner"><i></i><span id="bannerTxt">Preview: the controls work on screen but make no sound yet. Playback comes when this page is connected to Mopidy on the Raspberry Pi. <button class="link" data-act="notes">Build notes and album art sources</button></span></div>
 
   <div class="tools">
+    <label class="search"><span class="sr">Search artists, albums and tracks</span><input id="q" type="search" placeholder="Search artist, album or track. Enter plays the best match" autocomplete="off"></label>
     <button class="btn primary lucky" id="lucky"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="9" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="9" cy="15" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/></svg>Lucky album</button>
     <button class="btn primary lucky" id="luckyTrack"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1" fill="currentColor"/><circle cx="15" cy="15" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>Lucky track</button>
     <button class="btn gear" id="gear" aria-label="Settings" title="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
@@ -459,6 +462,18 @@ function albumView(a) {
     '<div class="actions"><button class="btn primary" data-act="play-album" data-id="' + a.id + '">' + I.play + 'Play album</button><button class="btn" data-act="shuffle-album" data-id="' + a.id + '">' + I.shuffle + 'Shuffle</button></div></div></div>' +
     '<ol class="tracks">' + rows + '</ol>';
 }
+function bestMatch(q) {
+  q = (q || '').trim().toLowerCase();
+  if (!q) return null;
+  const exact = ARTISTS.filter((r) => r.name.toLowerCase() === q), part = ARTISTS.filter((r) => r.name.toLowerCase().includes(q));
+  const r = (exact[0] || part[0]);
+  if (r) return { label: 'Best match: ' + r.name + ' (artist)', artist: r.name, queue: artistQueue(r.name), start: 0 };
+  const al = LIB.find((a) => a.ok.length && (a.artist + ' ' + a.album).toLowerCase().includes(q));
+  if (al) return { label: 'Best match: ' + cleanTitle(al.album) + ' by ' + al.artist, queue: albumQueue(al), start: 0 };
+  for (const a of LIB) { const t = a.ok.find((x) => x.t.toLowerCase().includes(q)); if (t) { const qu = albumQueue(a); return { label: 'Best match: ' + t.t + ' by ' + a.artist, queue: qu, start: qu.indexOf(t) }; } }
+  return null;
+}
+function playBest() { const b = bestMatch(S.q); if (!b || !b.queue.length) return false; startQueue(b.queue, Math.max(0, b.start)); return true; }
 function searchView() {
   const q = S.q.trim().toLowerCase();
   const albums = LIB.filter((a) => (a.artist + ' ' + a.album).toLowerCase().includes(q));
@@ -466,6 +481,8 @@ function searchView() {
   LIB.forEach((a) => a.tracks.forEach((t) => { if (t.t.toLowerCase().includes(q)) tracks.push(t); }));
   if (!albums.length && !tracks.length) return '<p class="empty">Nothing matches “' + esc(S.q.trim()) + '”. Try an artist, an album or part of a track name.</p>';
   let h = '';
+  const bm = bestMatch(q);
+  if (bm) h += '<div class="best"><b>' + esc(bm.label) + '</b>' + (bm.artist ? '<button class="btn primary" data-act="play-artist" data-name="' + esc(bm.artist) + '">' + I.play + 'Play</button><button class="btn" data-act="shuffle-artist" data-name="' + esc(bm.artist) + '">' + I.shuffle + 'Shuffle</button>' : '<button class="btn primary" data-act="play-best">' + I.play + 'Play</button>') + '</div>';
   if (albums.length) h += '<section class="artist"><div class="artist-head"><h2>Albums</h2><span class="muted">' + albums.length + ' found</span></div><div class="grid">' + albums.map(card).join('') + '</div></section>';
   if (tracks.length) h += '<section class="artist"><div class="artist-head"><h2>Tracks</h2><span class="muted">' + tracks.length + ' found' + (tracks.length > 60 ? ', showing 60' : '') + '</span></div><ol class="tracks">' + tracks.slice(0, 60).map((t) => trackRow(t, true)).join('') + '</ol></section>';
   return h;
@@ -741,6 +758,7 @@ document.addEventListener('click', (e) => {
     case 'open': openAlbum(+d.id, true); break;
     case 'close-case': closeCase(); break;
     case 'mode': S.mode = d.mode; S.q = ''; $('#q').value = ''; go(''); break;
+    case 'play-best': playBest(); break;
     case 'play-album': startQueue(albumQueue(LIB[+d.id]), 0); break;
     case 'shuffle-album': startQueue(shuffled(albumQueue(LIB[+d.id])), 0); break;
     case 'play-artist': startQueue(artistQueue(d.name), 0); break;
@@ -801,7 +819,7 @@ $('#prog').addEventListener('keydown', (e) => {
   if (e.key === 'ArrowLeft') { seek((S.t - 5) / (S.queue[S.pos] ? S.queue[S.pos].s : 1)); e.preventDefault(); }
 });
 $('#q').addEventListener('input', (e) => { S.q = e.target.value; render(); });
-$('#q').addEventListener('keydown', (e) => { if (e.key === 'Escape') { S.q = ''; e.target.value = ''; render(); } });
+$('#q').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); if (playBest()) { const q = $('#q'); q.blur(); } } if (e.key === 'Escape') { S.q = ''; e.target.value = ''; render(); } });
 
 /* Settings: talks to the helper (server.py) on the Pi. Without it (preview) the panel says so. */
 (function settings(){
